@@ -225,7 +225,6 @@ func getName(nameMap map[int]string, main int, all []int) *canvas.RichText {
 		link := all[i]
 		if link != main {
 			text.Add(linkFace, "\n + "+nameMap[link])
-			text.Add(linkFace, "\n + "+nameMap[link])
 		}
 	}
 	return text
