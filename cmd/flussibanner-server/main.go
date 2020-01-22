@@ -18,9 +18,10 @@ import (
 )
 
 var robotoFont *canvas.FontFamily
-var colorBackground = color.RGBA{R: 12, G: 80, B: 127, A: 255}
+
 var api *gw2api.GW2Api
 
+var colorBackground = color.RGBA{R: 12, G: 80, B: 127, A: 255}
 var colorGreen = color.RGBA{R: 94, G: 185, B: 94, A: 255}
 var colorBlue = color.RGBA{R: 14, G: 144, B: 210, A: 255}
 var colorRed = color.RGBA{R: 221, G: 81, B: 76, A: 255}
@@ -41,8 +42,6 @@ func main() {
 	loadFonts()
 
 	api = gw2api.NewGW2Api()
-
-	//debug()
 
 	http.HandleFunc("/png", func(w http.ResponseWriter, r *http.Request) {
 		img, _, _ := cache.Memoize("png", func() (interface{}, error) {
@@ -66,6 +65,7 @@ func main() {
 		i.Render(svg)
 		_ = svg.Close()
 	})
+
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 
@@ -78,18 +78,6 @@ func getImage() *canvas.Canvas {
 		return drawImage(matchWorld, worldNameMap, stats), nil
 	})
 	return canv.(*canvas.Canvas)
-}
-
-func debug() {
-	matchWorld, _ := api.MatchWorld(worldId)
-	worldNameMap := getWorldMap(matchWorld)
-	stats, _ := api.MatchWorldStats(worldId)
-	log.Println(matchWorld)
-	log.Println(worldNameMap)
-	log.Println(stats)
-
-	image := drawImage(matchWorld, worldNameMap, stats)
-	image.SavePNG("out.png", 2.0)
 }
 
 func setupMapHeaderMapping() {
@@ -126,7 +114,7 @@ func toMap(ids []gw2api.World) map[int]string {
 
 func loadFonts() {
 	robotoFont = canvas.NewFontFamily("roboto")
-	if err := robotoFont.LoadFontFile("./fonts/Roboto-Regular.ttf", canvas.FontRegular); err != nil {
+	if err := robotoFont.LoadFontFile("./res/fonts/Roboto-Regular.ttf", canvas.FontRegular); err != nil {
 		panic(err)
 	}
 }
@@ -221,7 +209,7 @@ func drawCellHeader(width float64, c *canvas.Context, x float64, column int, row
 }
 
 func drawEmblem(c *canvas.Context) float64 {
-	emblem, err := os.Open("./emblem.png")
+	emblem, err := os.Open("./res/emblem.png")
 	if err != nil {
 		panic(err)
 	}
