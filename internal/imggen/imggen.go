@@ -12,9 +12,24 @@ import (
 	"time"
 )
 
-var robotoFont = loadFont("roboto", "./res/fonts/Roboto-Regular.ttf", canvas.FontRegular)
+var robotoFont = loadRoboto()
+
+func loadRoboto() *canvas.FontFamily {
+	fontFamily := canvas.NewFontFamily("roboto")
+	loadFamily(fontFamily, "./res/fonts/Roboto-Regular.ttf", canvas.FontRegular)
+	loadFamily(fontFamily, "./res/fonts/Roboto-Bold.ttf", canvas.FontBold)
+	return fontFamily
+}
+
+func loadFamily(fontFamily *canvas.FontFamily, path string, style canvas.FontStyle) {
+	err := fontFamily.LoadFontFile(path, style)
+	if err != nil {
+		panic(err)
+	}
+}
 
 var colorBackground = color.RGBA{R: 12, G: 80, B: 127, A: 255}
+
 var colorGreen = color.RGBA{R: 94, G: 185, B: 94, A: 255}
 var colorBlue = color.RGBA{R: 14, G: 144, B: 210, A: 255}
 var colorRed = color.RGBA{R: 221, G: 81, B: 76, A: 255}
@@ -23,7 +38,7 @@ const logoMargin float64 = 10
 
 const rowSize float64 = 40
 const bottomOffset = 10
-const layout = "02.01.06 15:04:05 MST"
+const layout = "02.01.2006 15:04:05 MST"
 
 var mapToHeader = setupMapHeaderMapping()
 
@@ -34,17 +49,8 @@ func DrawImage(matchWorld gw2api.Match, worldNameMap map[int]string, stats gw2ap
 	return result
 }
 
-func loadFont(fontFamilyName string, path string, style canvas.FontStyle) *canvas.FontFamily {
-	fontFamily := canvas.NewFontFamily(fontFamilyName)
-	err := fontFamily.LoadFontFile(path, style)
-	if err != nil {
-		panic(err)
-	}
-	return fontFamily
-}
-
 func draw(c *canvas.Context, match gw2api.Match, worldNameMap map[int]string, stats gw2api.MatchStats) {
-	fillBackground(c)
+	fillCanvas(c, colorBackground)
 
 	//standardFace := robotoFont.Face(28.0, canvas.Black, canvas.FontRegular, canvas.FontNormal)
 	//
@@ -61,47 +67,53 @@ func draw(c *canvas.Context, match gw2api.Match, worldNameMap map[int]string, st
 	currentX += 10
 	currentX += drawServerNames(c, currentX, match, worldNameMap)
 	currentX += 10
-
-	scores := match.Skirmishes[len(match.Skirmishes)-1].Scores
-	currentX += drawScoreCell(c, currentX, match.VictoryPoints, "Victory Points")
+	currentX += drawBars(c, currentX, match.VictoryPoints, "Victory Points")
 	currentX += 20
-	currentX += drawScoreCell(c, currentX, scores, "Current Skirmish Score")
+	currentX += drawBars(c, currentX, match.Skirmishes[len(match.Skirmishes)-1].Scores, "Current Skirmish Score")
 	currentX += 20
-	//currentX += drawScoreCell(c, currentX, match, worldNameMap, match.Scores, "Total Score")
-	//currentX += 20
-	//currentX += drawScoreCell(c, currentX, match.Kills, "Kills")
-	//currentX += 20
-	//currentX += drawScoreCell(c, currentX, match.Deaths, "Deaths")
-
 	currentX += drawKillDeathRatio(c, currentX, stats)
+
 	//drawText(c, 30.0, canvas.NewTextBox(textFace, lorem[3], 140.0, 0.0, canvas.Justify, canvas.Top, 5.0, 0.0))
 	drawTimestamp(c)
 }
 
 func drawKillDeathRatio(c *canvas.Context, x float64, stats gw2api.MatchStats) float64 {
-	width := float64(35)
+	cellWidth := float64(35)
 
-	standardFace := robotoFont.Face(32.0, canvas.White, canvas.FontRegular, canvas.FontNormal)
-	textBox := canvas.NewTextBox(standardFace, "Kill/Death Ratio", width*5, rowSize/2, canvas.Center, canvas.Center, 0, 0)
-	c.DrawText(x, rowSize*3+rowSize/2-textBox.Bounds().Y+rowSize/2-textBox.Bounds().H/2, textBox)
+	headerFace := robotoFont.Face(40.0, canvas.White, canvas.FontRegular, canvas.FontNormal)
+	headerBox := canvas.NewTextBox(headerFace, "Kill/Death Ratio", cellWidth*5, rowSize/2, canvas.Center, canvas.Center, 0, 0)
+	c.DrawText(x, rowSize*3+rowSize/2-headerBox.Bounds().Y+rowSize/2-headerBox.Bounds().H/2, headerBox)
 
 	for i, wStats := range stats.Maps {
-		drawCell(width, c, x, i, 0, float64(wStats.Kills.Red)/float64(wStats.Deaths.Red))
-		drawCell(width, c, x, i, 1, float64(wStats.Kills.Blue)/float64(wStats.Deaths.Blue))
-		drawCell(width, c, x, i, 2, float64(wStats.Kills.Green)/float64(wStats.Deaths.Green))
-		drawCellHeader(width, c, x, i, 3, mapToHeader[wStats.Type])
+		kdGreen := float64(wStats.Kills.Green) / float64(wStats.Deaths.Green)
+		kdBlue := float64(wStats.Kills.Blue) / float64(wStats.Deaths.Blue)
+		kdRed := float64(wStats.Kills.Red) / float64(wStats.Deaths.Red)
+
+		bestKdMap := math.Max(kdGreen, math.Max(kdBlue, kdRed))
+
+		drawCellHeader(cellWidth, c, x, i, 3, mapToHeader[wStats.Type])
+		drawCell(cellWidth, c, x, i, 2, kdGreen, color.White, kdGreen == bestKdMap)
+		drawCell(cellWidth, c, x, i, 1, kdBlue, color.White, kdBlue == bestKdMap)
+		drawCell(cellWidth, c, x, i, 0, kdRed, color.White, kdRed == bestKdMap)
 	}
+	{
+		kdGreen := float64(stats.Kills.Green) / float64(stats.Deaths.Green)
+		kdBlue := float64(stats.Kills.Blue) / float64(stats.Deaths.Blue)
+		kdRed := float64(stats.Kills.Red) / float64(stats.Deaths.Red)
 
-	column := 4
-	drawCell(width, c, x, column, 0, float64(stats.Kills.Red)/float64(stats.Deaths.Red))
-	drawCell(width, c, x, column, 1, float64(stats.Kills.Blue)/float64(stats.Deaths.Blue))
-	drawCell(width, c, x, column, 2, float64(stats.Kills.Green)/float64(stats.Deaths.Green))
-	drawCellHeader(width, c, x, column, 3, "Ø")
+		bestKdMap := math.Max(kdGreen, math.Max(kdBlue, kdRed))
 
+		column := 4
+
+		drawCellHeader(cellWidth, c, x, column, 3, "Ø")
+		drawCell(cellWidth, c, x, column, 2, kdGreen, color.White, kdGreen == bestKdMap)
+		drawCell(cellWidth, c, x, column, 1, kdBlue, color.White, kdBlue == bestKdMap)
+		drawCell(cellWidth, c, x, column, 0, kdRed, color.White, kdRed == bestKdMap)
+	}
 	return 0
 }
 
-func drawCell(width float64, c *canvas.Context, x float64, column int, row int, kdRatio float64) {
+func drawCell(width float64, c *canvas.Context, x float64, column int, row int, kdRatio float64, textColor color.Color, isBestOnMap bool) {
 	c.SetStrokeColor(canvas.Red)
 	c.SetFillColor(color.Transparent)
 	c.SetStrokeWidth(1)
@@ -111,7 +123,13 @@ func drawCell(width float64, c *canvas.Context, x float64, column int, row int, 
 	//rectangle := canvas.Rectangle(width, rowSize)
 	//c.DrawPath(cellOffsetX, cellOffsetY, rectangle)
 
-	standardFace := robotoFont.Face(30.0, canvas.White, canvas.FontRegular, canvas.FontNormal)
+	var fontStyle canvas.FontStyle = canvas.FontRegular
+	decorators := make([]canvas.FontDecorator, 0)
+	if isBestOnMap {
+		fontStyle = canvas.FontBold
+		decorators = append(decorators, canvas.FontUnderline)
+	}
+	standardFace := robotoFont.Face(35.0, textColor, fontStyle, canvas.FontNormal, decorators...)
 	textBox := canvas.NewTextBox(standardFace, fmt.Sprintf("%.2f", kdRatio), width, rowSize, canvas.Center, canvas.Center, 0, 0)
 	c.DrawText(cellOffsetX, cellOffsetY-textBox.Bounds().Y+rowSize/2-textBox.Bounds().H/2, textBox)
 }
@@ -127,7 +145,7 @@ func drawCellHeader(width float64, c *canvas.Context, x float64, column int, row
 	//rectangle := canvas.Rectangle(width, thisRowSize)
 	//c.DrawPath(cellOffsetX, cellOffsetY, rectangle)
 
-	standardFace := robotoFont.Face(32.0, canvas.White, canvas.FontRegular, canvas.FontNormal)
+	standardFace := robotoFont.Face(40.0, canvas.White, canvas.FontRegular, canvas.FontNormal)
 	textBox := canvas.NewTextBox(standardFace, text, width, thisRowSize, canvas.Center, canvas.Center, 0, 0)
 	c.DrawText(cellOffsetX, cellOffsetY-textBox.Bounds().Y+thisRowSize/2-textBox.Bounds().H/2, textBox)
 }
@@ -156,7 +174,7 @@ func drawTimestamp(c *canvas.Context) {
 	c.DrawText(c.Width()-textLine.Bounds().W-textLine.Bounds().X-2, 2, textLine)
 }
 
-func drawScoreCell(c *canvas.Context, x float64, scores gw2api.TeamAssoc, title string) float64 {
+func drawBars(c *canvas.Context, x float64, scores gw2api.TeamAssoc, title string) float64 {
 	const barHeight = rowSize/2 - (2 * 4 /* padding */)
 	const barWith = 120
 	const radius = 3
@@ -250,11 +268,13 @@ func drawServeName(c *canvas.Context, currentX float64, row float64, cell *canva
 	c.DrawText(currentX-cell.Bounds().X+(width-cell.Bounds().W), offsetY-cell.Bounds().Y+rowSize/2-(cell.Bounds().H/2), cell)
 }
 
-func fillBackground(c *canvas.Context) {
-	c.SetFillColor(colorBackground)
+func fillCanvas(c *canvas.Context, color color.Color) {
+	c.Push()
+	c.SetFillColor(color)
 	p := canvas.Rectangle(c.Width(), c.Height())
 	c.DrawPath(0, 0, p)
 	c.Fill()
+	c.Pop()
 }
 
 func setupMapHeaderMapping() map[string]string {
