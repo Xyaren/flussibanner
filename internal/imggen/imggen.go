@@ -170,7 +170,7 @@ func drawEmblem(c *canvas.Context) float64 {
 
 func drawTimestamp(c *canvas.Context) {
 	standardFace := robotoFont.Face(20.0, canvas.White, canvas.FontRegular, canvas.FontNormal)
-	textLine := canvas.NewTextLine(standardFace, "Generated at "+time.Now().Format(layout), canvas.Center)
+	textLine := canvas.NewTextLine(standardFace, "Generated at "+time.Now().Format(layout)+"    © Tobi", canvas.Center)
 	c.DrawText(c.Width()-textLine.Bounds().W-textLine.Bounds().X-2, 2, textLine)
 }
 
