@@ -22,39 +22,15 @@ var options = jpeg.Options{Quality: 95}
 var apiCache = memoize.NewMemoizer(10*time.Second, 2*time.Minute)
 
 func main() {
-	cachePtr := flag.Bool("enableImageCache", false, "enable caching of the generated images (use if not proxy-caches by webserver)")
 	portPtr := flag.Int("port", 8080, "webserverPort")
-
 	flag.Parse()
 
-	var cache *memoize.Memoizer
-	if *cachePtr {
-		cacheDuration := 10 * time.Second
-		cache = memoize.NewMemoizer(cacheDuration, cacheDuration*10)
-	}
-
 	http.HandleFunc("/png", func(w http.ResponseWriter, r *http.Request) {
-		var img image.Image
-		if cache != nil {
-			cachedImage, _, _ := cache.Memoize("png", func() (interface{}, error) {
-				return getImage().WriteImage(2.0), nil
-			})
-			img = cachedImage.(image.Image)
-		} else {
-			img = getImage().WriteImage(2.0)
-		}
+		var img image.Image = getImage().WriteImage(2.0)
 		_ = png.Encode(w, img)
 	})
 	http.HandleFunc("/jpeg", func(w http.ResponseWriter, r *http.Request) {
-		var img image.Image
-		if cache != nil {
-			cachedImage, _, _ := cache.Memoize("jpeg", func() (interface{}, error) {
-				return getImage().WriteImage(2.0), nil
-			})
-			img = cachedImage.(image.Image)
-		} else {
-			img = getImage().WriteImage(2.0)
-		}
+		var img image.Image = getImage().WriteImage(2.0)
 		_ = jpeg.Encode(w, img, &options)
 	})
 	http.HandleFunc("/svg", func(w http.ResponseWriter, r *http.Request) {
