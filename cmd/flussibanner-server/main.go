@@ -17,6 +17,8 @@ import (
 
 const worldId int = 2202
 
+var options = jpeg.Options{Quality: 100}
+
 var apiCache = memoize.NewMemoizer(10*time.Second, 2*time.Minute)
 
 func main() {
@@ -53,7 +55,7 @@ func main() {
 		} else {
 			img = getImage().WriteImage(2.0)
 		}
-		_ = jpeg.Encode(w, img, nil)
+		_ = jpeg.Encode(w, img, &options)
 	})
 	http.HandleFunc("/svg", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Content-Type", "image/svg+xml")
