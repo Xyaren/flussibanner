@@ -126,7 +126,7 @@ func drawCell(width float64, c *canvas.Context, x float64, column int, row int, 
 	var fontStyle canvas.FontStyle = canvas.FontRegular
 	decorators := make([]canvas.FontDecorator, 0)
 	if isBestOnMap {
-		fontStyle = canvas.FontBold
+		//fontStyle = canvas.FontBold
 		decorators = append(decorators, canvas.FontUnderline)
 	}
 	standardFace := robotoFont.Face(35.0, textColor, fontStyle, canvas.FontNormal, decorators...)
