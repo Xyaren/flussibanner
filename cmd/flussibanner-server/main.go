@@ -17,7 +17,7 @@ import (
 
 const worldId int = 2202
 
-var options = jpeg.Options{Quality: 100}
+var options = jpeg.Options{Quality: 95}
 
 var apiCache = memoize.NewMemoizer(10*time.Second, 2*time.Minute)
 
