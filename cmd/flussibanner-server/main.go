@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"github.com/kofalt/go-memoize"
 	"github.com/tdewolff/canvas"
 	"github.com/xyaren/flussibanner/internal/api"
 	"github.com/xyaren/flussibanner/internal/imggen"
@@ -12,14 +11,11 @@ import (
 	"log"
 	"net/http"
 	"strconv"
-	"time"
 )
 
 const worldId int = 2202
 
 var options = jpeg.Options{Quality: 95}
-
-var apiCache = memoize.NewMemoizer(10*time.Second, 2*time.Minute)
 
 func main() {
 	portPtr := flag.Int("port", 8080, "webserverPort")
@@ -46,10 +42,6 @@ func main() {
 }
 
 func getImage() *canvas.Canvas {
-	canv, _, _ := apiCache.Memoize("img", func() (interface{}, error) {
-		match, nameMap, stats := api.GetData(worldId)
-
-		return imggen.DrawImage(match, nameMap, stats), nil
-	})
-	return canv.(*canvas.Canvas)
+	match, nameMap, stats := api.GetData(worldId)
+	return imggen.DrawImage(match, nameMap, stats)
 }
