@@ -220,8 +220,13 @@ func drawScore(offset float64, score float64, highestScore float64, totalScore f
 	c.DrawPath(x+sizeInset, offset+rowSize/2+barGreen.Bounds().H/2+sizeInset*2-1, barGreen)
 
 	standardFace := robotoFont.Face(30.0, canvas.White, canvas.FontRegular, canvas.FontNormal)
-	text := fmt.Sprintf("%.0f (%.1f%%)", score, (score/totalScore)*100)
 
+	var text string
+	if score == 0 || totalScore == 0 {
+		text = fmt.Sprintf("%.0f", score)
+	} else {
+		text = fmt.Sprintf("%.0f (%.1f%%)", score, (score/totalScore)*100)
+	}
 	box := canvas.NewTextBox(standardFace, text, barWidth, cellHeight, canvas.Center, canvas.Top, 0, 0)
 
 	c.DrawText(x, offset+(rowSize/2)+1, box)
