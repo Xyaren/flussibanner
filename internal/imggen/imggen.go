@@ -123,14 +123,22 @@ func drawCell(width float64, c *canvas.Context, x float64, column int, row int, 
 	//rectangle := canvas.Rectangle(width, rowSize)
 	//c.DrawPath(cellOffsetX, cellOffsetY, rectangle)
 
-	var fontStyle canvas.FontStyle = canvas.FontRegular
+	var fontStyle = canvas.FontRegular
 	decorators := make([]canvas.FontDecorator, 0)
-	if isBestOnMap {
+	if !math.IsNaN(kdRatio) && isBestOnMap {
 		//fontStyle = canvas.FontBold
 		decorators = append(decorators, canvas.FontUnderline)
 	}
 	standardFace := robotoFont.Face(35.0, textColor, fontStyle, canvas.FontNormal, decorators...)
-	textBox := canvas.NewTextBox(standardFace, fmt.Sprintf("%.2f", kdRatio), width, rowSize, canvas.Center, canvas.Center, 0, 0)
+
+	var text string
+	if math.IsNaN(kdRatio) {
+		text = "-"
+	} else {
+		text = fmt.Sprintf("%.2f", kdRatio)
+	}
+
+	textBox := canvas.NewTextBox(standardFace, text, width, rowSize, canvas.Center, canvas.Center, 0, 0)
 	c.DrawText(cellOffsetX, cellOffsetY-textBox.Bounds().Y+rowSize/2-textBox.Bounds().H/2, textBox)
 }
 
