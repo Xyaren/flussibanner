@@ -64,7 +64,7 @@ func draw(c *canvas.Context, match gw2api.Match, worldNameMap map[int]string, st
 	imageOffset := drawEmblem(c)
 	currentX := imageOffset
 
-	currentX += 10
+	currentX += 5
 	currentX += drawServerNames(c, currentX, match, worldNameMap)
 	currentX += 10
 	currentX += drawBars(c, currentX, match.VictoryPoints, "Victory Points")
@@ -243,17 +243,16 @@ func drawScore(offset float64, score float64, highestScore float64, totalScore f
 }
 
 func drawServerNames(c *canvas.Context, currentX float64, match gw2api.Match, worldNameMap map[int]string) float64 {
-	maxWidth := float64(120)
+	maxWidth := float64(105)
 	greenText := getName(worldNameMap, match.Worlds.Green, match.AllWorlds.Green).ToText(maxWidth, rowSize, canvas.Right, canvas.Center, 0, 0)
 	blueText := getName(worldNameMap, match.Worlds.Blue, match.AllWorlds.Blue).ToText(maxWidth, rowSize, canvas.Right, canvas.Center, 0, 0)
 	redText := getName(worldNameMap, match.Worlds.Red, match.AllWorlds.Red).ToText(maxWidth, rowSize, canvas.Right, canvas.Center, 0, 0)
-	maxBoxWidth := math.Max(greenText.Bounds().W, math.Max(blueText.Bounds().W, redText.Bounds().W))
+	//maxBoxWidth := math.Max(greenText.Bounds().W, math.Max(blueText.Bounds().W, redText.Bounds().W))
 
-	drawServeName(c, currentX, 2, greenText, maxBoxWidth)
-	drawServeName(c, currentX, 1, blueText, maxBoxWidth)
-	drawServeName(c, currentX, 0, redText, maxBoxWidth)
-
-	return maxBoxWidth
+	drawServeName(c, currentX, 2, greenText, maxWidth)
+	drawServeName(c, currentX, 1, blueText, maxWidth)
+	drawServeName(c, currentX, 0, redText, maxWidth)
+	return maxWidth
 }
 
 func getName(nameMap map[int]string, main int, all []int) *canvas.RichText {
