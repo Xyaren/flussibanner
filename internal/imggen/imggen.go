@@ -9,6 +9,7 @@ import (
 	"image/png"
 	"math"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -42,14 +43,14 @@ const layout = "02.01.2006 15:04:05 MST"
 
 var mapToHeader = setupMapHeaderMapping()
 
-func DrawImage(matchWorld gw2api.Match, worldNameMap map[int]string, stats gw2api.MatchStats) *canvas.Canvas {
+func DrawImage(matchWorld gw2api.Match, worldNameMap map[int]string, stats gw2api.MatchStats, worldId int) *canvas.Canvas {
 	result := canvas.New(710, bottomOffset+rowSize*4)
 	ctx := canvas.NewContext(result)
-	draw(ctx, matchWorld, worldNameMap, stats)
+	draw(ctx, matchWorld, worldNameMap, stats, worldId)
 	return result
 }
 
-func draw(c *canvas.Context, match gw2api.Match, worldNameMap map[int]string, stats gw2api.MatchStats) {
+func draw(c *canvas.Context, match gw2api.Match, worldNameMap map[int]string, stats gw2api.MatchStats, worldId int) {
 	fillCanvas(c, colorBackground)
 
 	//standardFace := robotoFont.Face(28.0, canvas.Black, canvas.FontRegular, canvas.FontNormal)
@@ -60,12 +61,16 @@ func draw(c *canvas.Context, match gw2api.Match, worldNameMap map[int]string, st
 
 	//drawText(c, 30.0, canvas.NewTextBox(standardFace, "Document Example", 0.0, 0.0, canvas.Left, canvas.Top, 0.0, 0.0))
 	//drawText(c, 30.0, canvas.NewTextBox(textFace, lorem[0], 140.0, 0.0, canvas.Justify, canvas.Top, 5.0, 0.0))
+	split := strings.Split(match.ID, "-")
+	//region := split[0];
+	tier := split[1]
 
 	imageOffset := drawEmblem(c)
 	currentX := imageOffset
 
 	currentX += 5
-	currentX += drawServerNames(c, currentX, match, worldNameMap)
+
+	currentX += drawServerNames(c, currentX, match, worldNameMap, tier, worldId)
 	currentX += 10
 	currentX += drawBars(c, currentX, match.VictoryPoints, "Victory Points")
 	currentX += 20
@@ -178,7 +183,8 @@ func drawEmblem(c *canvas.Context) float64 {
 
 func drawTimestamp(c *canvas.Context) {
 	standardFace := robotoFont.Face(20.0, canvas.White, canvas.FontRegular, canvas.FontNormal)
-	textLine := canvas.NewTextLine(standardFace, "Generated at "+time.Now().Format(layout)+"    © Tobi", canvas.Center)
+	loc, _ := time.LoadLocation("Europe/Berlin")
+	textLine := canvas.NewTextLine(standardFace, "Generated at "+time.Now().In(loc).Format(layout)+"    © Tobi", canvas.Center)
 	c.DrawText(c.Width()-textLine.Bounds().W-textLine.Bounds().X-2, 2, textLine)
 }
 
@@ -242,12 +248,14 @@ func drawScore(offset float64, score float64, highestScore float64, totalScore f
 	return barWidth
 }
 
-func drawServerNames(c *canvas.Context, currentX float64, match gw2api.Match, worldNameMap map[int]string) float64 {
+func drawServerNames(c *canvas.Context, currentX float64, match gw2api.Match, worldNameMap map[int]string, tier string, worldId int) float64 {
 	maxWidth := float64(105)
-	greenText := getName(worldNameMap, match.Worlds.Green, match.AllWorlds.Green).ToText(maxWidth, rowSize, canvas.Right, canvas.Center, 0, 0)
-	blueText := getName(worldNameMap, match.Worlds.Blue, match.AllWorlds.Blue).ToText(maxWidth, rowSize, canvas.Right, canvas.Center, 0, 0)
-	redText := getName(worldNameMap, match.Worlds.Red, match.AllWorlds.Red).ToText(maxWidth, rowSize, canvas.Right, canvas.Center, 0, 0)
+	greenText := getName(worldNameMap, match.Worlds.Green, match.AllWorlds.Green, worldId).ToText(maxWidth, rowSize, canvas.Right, canvas.Center, 0, 0)
+	blueText := getName(worldNameMap, match.Worlds.Blue, match.AllWorlds.Blue, worldId).ToText(maxWidth, rowSize, canvas.Right, canvas.Center, 0, 0)
+	redText := getName(worldNameMap, match.Worlds.Red, match.AllWorlds.Red, worldId).ToText(maxWidth, rowSize, canvas.Right, canvas.Center, 0, 0)
 	//maxBoxWidth := math.Max(greenText.Bounds().W, math.Max(blueText.Bounds().W, redText.Bounds().W))
+
+	drawTier(c, currentX, tier, maxWidth)
 
 	drawServeName(c, currentX, 2, greenText, maxWidth)
 	drawServeName(c, currentX, 1, blueText, maxWidth)
@@ -255,17 +263,35 @@ func drawServerNames(c *canvas.Context, currentX float64, match gw2api.Match, wo
 	return maxWidth
 }
 
-func getName(nameMap map[int]string, main int, all []int) *canvas.RichText {
+func drawTier(c *canvas.Context, currentX float64, tier string, maxWidth float64) {
+	standardFace := robotoFont.Face(45.0, canvas.White, canvas.FontBold, canvas.FontNormal)
+	text := "Tier " + tier
+	box := canvas.NewTextBox(standardFace, text, maxWidth, rowSize, canvas.Right, canvas.Center, 0, 0)
+	c.DrawText(currentX, bottomOffset+rowSize*3+rowSize, box)
+}
+
+func getName(nameMap map[int]string, main int, all []int, worldId int) *canvas.RichText {
 	standardFace := robotoFont.Face(35.0, canvas.White, canvas.FontRegular, canvas.FontNormal)
+	standardFaceTargetWorld := robotoFont.Face(35.0, canvas.White, canvas.FontBold, canvas.FontNormal)
 	linkFace := robotoFont.Face(25.0, canvas.White, canvas.FontRegular, canvas.FontNormal)
+	linkFaceTargetWorld := robotoFont.Face(25.0, canvas.White, canvas.FontBold, canvas.FontNormal)
 
 	text := canvas.NewRichText()
-	text.Add(standardFace, nameMap[main])
+
+	if main == worldId {
+		text.Add(standardFaceTargetWorld, nameMap[main])
+	} else {
+		text.Add(standardFace, nameMap[main])
+	}
 
 	for i := range all {
 		link := all[i]
 		if link != main {
-			text.Add(linkFace, "\n + "+nameMap[link])
+			if link == worldId {
+				text.Add(linkFaceTargetWorld, "\n + "+nameMap[link])
+			} else {
+				text.Add(linkFace, "\n + "+nameMap[link])
+			}
 		}
 	}
 	return text
