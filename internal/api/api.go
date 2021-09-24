@@ -1,9 +1,11 @@
 package api
 
 import (
+	"fmt"
+	"log"
+
 	"github.com/avast/retry-go"
 	"github.com/xyaren/gw2api"
-	"log"
 )
 
 var api = gw2api.NewGW2Api()
@@ -15,7 +17,8 @@ var lastMatchId *string = nil
 func GetData(worldId int) (gw2api.Match, map[int]string, gw2api.MatchStats) {
 	var match *gw2api.Match
 	if lastMatchId != nil {
-		match = getMatchById(*lastMatchId)
+		matchById := getMatchById(*lastMatchId)
+		match = &matchById
 	}
 	if match == nil || !isInMatch(worldId, *match) {
 		//log.Printf("Not in match: %s", match.ID)
@@ -75,12 +78,18 @@ func getMatches() []gw2api.Match {
 	return matchWorld
 }
 
-func getMatch(worldId int) gw2api.Match {
-	var matchWorld gw2api.Match
+func getMatchById(matchId string) gw2api.Match {
+	var match gw2api.Match
 	err := retry.Do(
 		func() error {
 			var err error
-			matchWorld, err = api.MatchWorld(worldId)
+			var matches []gw2api.Match
+			matches, err = api.MatchIds(matchId)
+
+			if len(matches) < 1 {
+				return fmt.Errorf("response without matches received for query by id %v: %v", matchId, matches)
+			}
+			match = matches[0]
 
 			if err != nil && err.Error() != "Endpoint returned error: " {
 				return err
@@ -92,29 +101,7 @@ func getMatch(worldId int) gw2api.Match {
 	if err != nil {
 		panic(err)
 	}
-	return matchWorld
-}
-
-func getMatchById(matchId string) *gw2api.Match {
-	var matchWorld gw2api.Match
-	err := retry.Do(
-		func() error {
-			var err error
-			var matchWorlds []gw2api.Match
-			matchWorlds, err = api.MatchIds(matchId)
-			matchWorld = matchWorlds[0]
-
-			if err != nil && err.Error() != "Endpoint returned error: " {
-				return err
-			}
-			return nil
-		},
-		retryLog,
-	)
-	if err != nil {
-		panic(err)
-	}
-	return &matchWorld
+	return match
 }
 
 func getStats(matchId string) gw2api.MatchStats {

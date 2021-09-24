@@ -1,33 +1,23 @@
 package imggen
 
 import (
+	"bytes"
+	_ "embed"
 	"fmt"
-	"github.com/adam-lavrik/go-imath/ix"
-	"github.com/tdewolff/canvas"
-	"github.com/xyaren/gw2api"
+	"image"
 	"image/color"
 	"image/png"
 	"math"
-	"os"
 	"strings"
 	"time"
+
+	"github.com/adam-lavrik/go-imath/ix"
+	"github.com/tdewolff/canvas"
+	"github.com/xyaren/gw2api"
 )
 
-var robotoFont = loadRoboto()
-
-func loadRoboto() *canvas.FontFamily {
-	fontFamily := canvas.NewFontFamily("roboto")
-	loadFamily(fontFamily, "./res/fonts/Roboto-Regular.ttf", canvas.FontRegular)
-	loadFamily(fontFamily, "./res/fonts/Roboto-Bold.ttf", canvas.FontBold)
-	return fontFamily
-}
-
-func loadFamily(fontFamily *canvas.FontFamily, path string, style canvas.FontStyle) {
-	err := fontFamily.LoadFontFile(path, style)
-	if err != nil {
-		panic(err)
-	}
-}
+//go:embed res/emblem.png
+var emblem []byte
 
 var colorBackground = color.RGBA{R: 12, G: 80, B: 127, A: 255}
 
@@ -43,63 +33,70 @@ const layout = "02.01.2006 15:04:05 MST"
 
 var mapToHeader = setupMapHeaderMapping()
 
-func DrawImage(matchWorld gw2api.Match, worldNameMap map[int]string, stats gw2api.MatchStats, worldId int) *canvas.Canvas {
+type Imager struct {
+	worldId  uint
+	emblem   image.Image
+	location *time.Location
+}
+
+func NewImager() *Imager {
+	imager := Imager{}
+	imager.emblem = loadImage()
+
+	location, _ := time.LoadLocation("Europe/Berlin")
+	imager.location = location
+
+	return &imager
+}
+
+func (i *Imager) DrawImage(matchWorld gw2api.Match, worldNameMap map[int]string, stats gw2api.MatchStats, worldId int) *canvas.Canvas {
 	result := canvas.New(710, bottomOffset+rowSize*4)
 	ctx := canvas.NewContext(result)
-	draw(ctx, matchWorld, worldNameMap, stats, worldId)
+	i.draw(ctx, matchWorld, worldNameMap, stats, worldId)
 	return result
 }
 
-func draw(c *canvas.Context, match gw2api.Match, worldNameMap map[int]string, stats gw2api.MatchStats, worldId int) {
-	fillCanvas(c, colorBackground)
+func (i *Imager) draw(c *canvas.Context, match gw2api.Match, worldNameMap map[int]string, stats gw2api.MatchStats, worldId int) {
+	i.fillCanvas(c, colorBackground)
 
-	//standardFace := robotoFont.Face(28.0, canvas.Black, canvas.FontRegular, canvas.FontNormal)
-	//
-	//
-	//
-	//textFace := robotoFont.Face(12.0, canvas.Black, canvas.FontRegular, canvas.FontNormal)
-
-	//drawText(c, 30.0, canvas.NewTextBox(standardFace, "Document Example", 0.0, 0.0, canvas.Left, canvas.Top, 0.0, 0.0))
-	//drawText(c, 30.0, canvas.NewTextBox(textFace, lorem[0], 140.0, 0.0, canvas.Justify, canvas.Top, 5.0, 0.0))
 	split := strings.Split(match.ID, "-")
-	//region := split[0];
 	tier := split[1]
 
-	imageOffset := drawEmblem(c)
+	imageOffset := i.drawEmblem(c)
 	currentX := imageOffset
 
 	currentX += 5
 
-	currentX += drawServerNames(c, currentX, match, worldNameMap, tier, worldId)
+	currentX += i.drawServerNames(c, currentX, match, worldNameMap, tier, worldId)
 	currentX += 10
-	currentX += drawBars(c, currentX, match.VictoryPoints, "Victory Points")
-	currentX += 20
-	currentX += drawBars(c, currentX, match.Skirmishes[len(match.Skirmishes)-1].Scores, "Current Skirmish Score")
-	currentX += 20
-	currentX += drawKillDeathRatio(c, currentX, stats)
+	currentX += i.drawBars(c, currentX, match.VictoryPoints, "Victory Points")
+	currentX += 10
+	currentX += i.drawBars(c, currentX, match.Skirmishes[len(match.Skirmishes)-1].Scores, "Current Skirmish Score")
+	currentX += 10
+	currentX += i.drawKillDeathRatio(c, currentX, stats)
 
 	//drawText(c, 30.0, canvas.NewTextBox(textFace, lorem[3], 140.0, 0.0, canvas.Justify, canvas.Top, 5.0, 0.0))
-	drawTimestamp(c)
+	i.drawTimestamp(c)
 }
 
-func drawKillDeathRatio(c *canvas.Context, x float64, stats gw2api.MatchStats) float64 {
-	cellWidth := float64(35)
+func (i *Imager) drawKillDeathRatio(c *canvas.Context, x float64, stats gw2api.MatchStats) float64 {
+	cellWidth := float64(32)
 
-	headerFace := robotoFont.Face(40.0, canvas.White, canvas.FontRegular, canvas.FontNormal)
+	headerFace := roboto.Face(40.0, canvas.White, canvas.FontRegular, canvas.FontNormal)
 	headerBox := canvas.NewTextBox(headerFace, "Kill/Death Ratio", cellWidth*5, rowSize/2, canvas.Center, canvas.Center, 0, 0)
 	c.DrawText(x, rowSize*3+rowSize/2-headerBox.Bounds().Y+rowSize/2-headerBox.Bounds().H/2, headerBox)
 
-	for i, wStats := range stats.Maps {
+	for idx, wStats := range stats.Maps {
 		kdGreen := float64(wStats.Kills.Green) / float64(wStats.Deaths.Green)
 		kdBlue := float64(wStats.Kills.Blue) / float64(wStats.Deaths.Blue)
 		kdRed := float64(wStats.Kills.Red) / float64(wStats.Deaths.Red)
 
 		bestKdMap := math.Max(kdGreen, math.Max(kdBlue, kdRed))
 
-		drawCellHeader(cellWidth, c, x, i, 3, mapToHeader[wStats.Type])
-		drawCell(cellWidth, c, x, i, 2, kdGreen, color.White, kdGreen == bestKdMap)
-		drawCell(cellWidth, c, x, i, 1, kdBlue, color.White, kdBlue == bestKdMap)
-		drawCell(cellWidth, c, x, i, 0, kdRed, color.White, kdRed == bestKdMap)
+		i.drawCellHeader(cellWidth, c, x, idx, 3, mapToHeader[wStats.Type])
+		i.drawCell(cellWidth, c, x, idx, 2, kdGreen, color.White, kdGreen == bestKdMap)
+		i.drawCell(cellWidth, c, x, idx, 1, kdBlue, color.White, kdBlue == bestKdMap)
+		i.drawCell(cellWidth, c, x, idx, 0, kdRed, color.White, kdRed == bestKdMap)
 	}
 	{
 		kdGreen := float64(stats.Kills.Green) / float64(stats.Deaths.Green)
@@ -110,15 +107,15 @@ func drawKillDeathRatio(c *canvas.Context, x float64, stats gw2api.MatchStats) f
 
 		column := 4
 
-		drawCellHeader(cellWidth, c, x, column, 3, "Ø")
-		drawCell(cellWidth, c, x, column, 2, kdGreen, color.White, kdGreen == bestKdMap)
-		drawCell(cellWidth, c, x, column, 1, kdBlue, color.White, kdBlue == bestKdMap)
-		drawCell(cellWidth, c, x, column, 0, kdRed, color.White, kdRed == bestKdMap)
+		i.drawCellHeader(cellWidth, c, x, column, 3, "Ø")
+		i.drawCell(cellWidth, c, x, column, 2, kdGreen, color.White, kdGreen == bestKdMap)
+		i.drawCell(cellWidth, c, x, column, 1, kdBlue, color.White, kdBlue == bestKdMap)
+		i.drawCell(cellWidth, c, x, column, 0, kdRed, color.White, kdRed == bestKdMap)
 	}
 	return 0
 }
 
-func drawCell(width float64, c *canvas.Context, x float64, column int, row int, kdRatio float64, textColor color.Color, isBestOnMap bool) {
+func (i *Imager) drawCell(width float64, c *canvas.Context, x float64, column int, row int, kdRatio float64, textColor color.Color, isBestOnMap bool) {
 	c.SetStrokeColor(canvas.Red)
 	c.SetFillColor(color.Transparent)
 	c.SetStrokeWidth(1)
@@ -134,7 +131,7 @@ func drawCell(width float64, c *canvas.Context, x float64, column int, row int, 
 		//fontStyle = canvas.FontBold
 		decorators = append(decorators, canvas.FontUnderline)
 	}
-	standardFace := robotoFont.Face(35.0, textColor, fontStyle, canvas.FontNormal, decorators...)
+	standardFace := roboto.Face(35.0, textColor, fontStyle, canvas.FontNormal, decorators...)
 
 	var text string
 	if math.IsNaN(kdRatio) {
@@ -147,7 +144,7 @@ func drawCell(width float64, c *canvas.Context, x float64, column int, row int, 
 	c.DrawText(cellOffsetX, cellOffsetY-textBox.Bounds().Y+rowSize/2-textBox.Bounds().H/2, textBox)
 }
 
-func drawCellHeader(width float64, c *canvas.Context, x float64, column int, row int, text string) {
+func (i *Imager) drawCellHeader(width float64, c *canvas.Context, x float64, column int, row int, text string) {
 	thisRowSize := rowSize / 2
 	c.SetStrokeColor(canvas.Red)
 	c.SetFillColor(color.Transparent)
@@ -158,55 +155,54 @@ func drawCellHeader(width float64, c *canvas.Context, x float64, column int, row
 	//rectangle := canvas.Rectangle(width, thisRowSize)
 	//c.DrawPath(cellOffsetX, cellOffsetY, rectangle)
 
-	standardFace := robotoFont.Face(40.0, canvas.White, canvas.FontRegular, canvas.FontNormal)
+	standardFace := roboto.Face(40.0, canvas.White, canvas.FontRegular, canvas.FontNormal)
 	textBox := canvas.NewTextBox(standardFace, text, width, thisRowSize, canvas.Center, canvas.Center, 0, 0)
 	c.DrawText(cellOffsetX, cellOffsetY-textBox.Bounds().Y+thisRowSize/2-textBox.Bounds().H/2, textBox)
 }
 
-func drawEmblem(c *canvas.Context) float64 {
-	emblem, err := os.Open("./res/emblem.png")
-	if err != nil {
-		panic(err)
-	}
-	img, err := png.Decode(emblem)
-	if err != nil {
-		panic(err)
-	}
+func (i *Imager) drawEmblem(c *canvas.Context) float64 {
+	img := i.emblem
 	imageBounds := img.Bounds().Max
 	imgDPM := float64(imageBounds.Y) / (c.Height() - logoMargin*2)
-	//imgWidth := float64(img.Bounds().Max.X) / imgDPM
-	//imgHeight := float64(img.Bounds().Max.Y) / imgDPM
-	c.DrawImage(logoMargin, 0+logoMargin, img, imgDPM)
+
+	c.DrawImage(logoMargin, 0+logoMargin, img, canvas.DPMM(imgDPM))
 	imageOffset := float64(img.Bounds().Max.X) / imgDPM
 	return imageOffset + logoMargin
 }
 
-func drawTimestamp(c *canvas.Context) {
-	standardFace := robotoFont.Face(20.0, canvas.White, canvas.FontRegular, canvas.FontNormal)
-	loc, _ := time.LoadLocation("Europe/Berlin")
-	textLine := canvas.NewTextLine(standardFace, "Generated at "+time.Now().In(loc).Format(layout)+"    © Tobi", canvas.Center)
+func loadImage() image.Image {
+	img, err := png.Decode(bytes.NewReader(emblem))
+	if err != nil {
+		panic(err)
+	}
+	return img
+}
+
+func (i *Imager) drawTimestamp(c *canvas.Context) {
+	standardFace := roboto.Face(20.0, canvas.White, canvas.FontRegular, canvas.FontNormal)
+	textLine := canvas.NewTextLine(standardFace, "Generated at "+time.Now().In(i.location).Format(layout)+"    © Tobi", canvas.Center)
 	c.DrawText(c.Width()-textLine.Bounds().W-textLine.Bounds().X-2, 2, textLine)
 }
 
-func drawBars(c *canvas.Context, x float64, scores gw2api.TeamAssoc, title string) float64 {
+func (i *Imager) drawBars(c *canvas.Context, x float64, scores gw2api.TeamAssoc, title string) float64 {
 	const barHeight = rowSize/2 - (2 * 4 /* padding */)
 	const barWith = 120
 	const radius = 3
 
-	standardFace := robotoFont.Face(45.0, canvas.White, canvas.FontRegular, canvas.FontNormal)
+	standardFace := roboto.Face(45.0, canvas.White, canvas.FontRegular, canvas.FontNormal)
 	box := canvas.NewTextBox(standardFace, title, barWith, rowSize, canvas.Center, canvas.Center, 0, 0)
 	c.DrawText(x, bottomOffset+rowSize*3+rowSize, box)
 
 	maxScore := float64(ix.Maxs(scores.Green, scores.Blue, scores.Red))
 	totalScore := float64(scores.Green + scores.Blue + scores.Red)
 	width := 0.0
-	width = math.Max(width, drawScore(bottomOffset+rowSize*2, float64(scores.Green), maxScore, totalScore, barWith, barHeight, radius, colorGreen, c, x))
-	width = math.Max(width, drawScore(bottomOffset+rowSize*1, float64(scores.Blue), maxScore, totalScore, barWith, barHeight, radius, colorBlue, c, x))
-	width = math.Max(width, drawScore(bottomOffset+rowSize*0, float64(scores.Red), maxScore, totalScore, barWith, barHeight, radius, colorRed, c, x))
+	width = math.Max(width, i.drawScore(bottomOffset+rowSize*2, float64(scores.Green), maxScore, totalScore, barWith, barHeight, radius, colorGreen, c, x))
+	width = math.Max(width, i.drawScore(bottomOffset+rowSize*1, float64(scores.Blue), maxScore, totalScore, barWith, barHeight, radius, colorBlue, c, x))
+	width = math.Max(width, i.drawScore(bottomOffset+rowSize*0, float64(scores.Red), maxScore, totalScore, barWith, barHeight, radius, colorRed, c, x))
 	return width
 }
 
-func drawScore(offset float64, score float64, highestScore float64, totalScore float64, barWidth float64, barHeight float64, radius float64, barColor color.Color, c *canvas.Context, x float64) float64 {
+func (i *Imager) drawScore(offset float64, score float64, highestScore float64, totalScore float64, barWidth float64, barHeight float64, radius float64, barColor color.Color, c *canvas.Context, x float64) float64 {
 	cellHeight := rowSize/2 - (2 * 2)
 
 	//c.SetStrokeColor(barColor)
@@ -226,14 +222,14 @@ func drawScore(offset float64, score float64, highestScore float64, totalScore f
 
 	barGreen := &canvas.Path{}
 	barGreen = canvas.RoundedRectangle((score/highestScore)*barWidth-sizeInset*2, barHeight-sizeInset*2, radius)
-	barGreen = barGreen.Close()
+	barGreen.Close()
 
 	c.SetStrokeWidth(0)
 	c.SetFillColor(barColor)
 	c.SetStrokeColor(canvas.White)
 	c.DrawPath(x+sizeInset, offset+rowSize/2+barGreen.Bounds().H/2+sizeInset*2-1, barGreen)
 
-	standardFace := robotoFont.Face(30.0, canvas.White, canvas.FontRegular, canvas.FontNormal)
+	standardFace := roboto.Face(30.0, canvas.White, canvas.FontRegular, canvas.FontNormal)
 
 	var text string
 	if score == 0 || totalScore == 0 {
@@ -248,65 +244,71 @@ func drawScore(offset float64, score float64, highestScore float64, totalScore f
 	return barWidth
 }
 
-func drawServerNames(c *canvas.Context, currentX float64, match gw2api.Match, worldNameMap map[int]string, tier string, worldId int) float64 {
-	maxWidth := float64(105)
-	greenText := getName(worldNameMap, match.Worlds.Green, match.AllWorlds.Green, worldId).ToText(maxWidth, rowSize, canvas.Right, canvas.Center, 0, 0)
-	blueText := getName(worldNameMap, match.Worlds.Blue, match.AllWorlds.Blue, worldId).ToText(maxWidth, rowSize, canvas.Right, canvas.Center, 0, 0)
-	redText := getName(worldNameMap, match.Worlds.Red, match.AllWorlds.Red, worldId).ToText(maxWidth, rowSize, canvas.Right, canvas.Center, 0, 0)
+func (i *Imager) drawServerNames(c *canvas.Context, currentX float64, match gw2api.Match, worldNameMap map[int]string, tier string, worldId int) float64 {
+	maxWidth := float64(130)
+	greenText := i.getName(worldNameMap, match.Worlds.Green, match.AllWorlds.Green, worldId)
+	blueText := i.getName(worldNameMap, match.Worlds.Blue, match.AllWorlds.Blue, worldId)
+	redText := i.getName(worldNameMap, match.Worlds.Red, match.AllWorlds.Red, worldId)
 	//maxBoxWidth := math.Max(greenText.Bounds().W, math.Max(blueText.Bounds().W, redText.Bounds().W))
 
-	drawTier(c, currentX, tier, maxWidth)
+	i.drawTier(c, currentX, tier, maxWidth)
 
-	drawServeName(c, currentX, 2, greenText, maxWidth)
-	drawServeName(c, currentX, 1, blueText, maxWidth)
-	drawServeName(c, currentX, 0, redText, maxWidth)
+	i.drawServeName(c, currentX, 2, greenText, maxWidth)
+	i.drawServeName(c, currentX, 1, blueText, maxWidth)
+	i.drawServeName(c, currentX, 0, redText, maxWidth)
 	return maxWidth
 }
 
-func drawTier(c *canvas.Context, currentX float64, tier string, maxWidth float64) {
-	standardFace := robotoFont.Face(45.0, canvas.White, canvas.FontBold, canvas.FontNormal)
+func (i *Imager) drawTier(c *canvas.Context, currentX float64, tier string, maxWidth float64) {
+	standardFace := roboto.Face(45.0, canvas.White, canvas.FontBold, canvas.FontNormal)
 	text := "Tier " + tier
 	box := canvas.NewTextBox(standardFace, text, maxWidth, rowSize, canvas.Right, canvas.Center, 0, 0)
 	c.DrawText(currentX, bottomOffset+rowSize*3+rowSize, box)
 }
 
-func getName(nameMap map[int]string, main int, all []int, worldId int) *canvas.RichText {
-	standardFace := robotoFont.Face(35.0, canvas.White, canvas.FontRegular, canvas.FontNormal)
-	standardFaceTargetWorld := robotoFont.Face(35.0, canvas.White, canvas.FontBold, canvas.FontNormal)
-	linkFace := robotoFont.Face(25.0, canvas.White, canvas.FontRegular, canvas.FontNormal)
-	linkFaceTargetWorld := robotoFont.Face(25.0, canvas.White, canvas.FontBold, canvas.FontNormal)
+func (i *Imager) getName(nameMap map[int]string, main int, all []int, worldId int) *canvas.RichText {
+	standardFace := roboto.Face(35.0, canvas.White, canvas.FontRegular, canvas.FontNormal)
+	standardFaceTargetWorld := roboto.Face(35.0, canvas.White, canvas.FontBold, canvas.FontNormal)
+	linkFace := roboto.Face(25.0, canvas.White, canvas.FontRegular, canvas.FontNormal)
+	linkFaceTargetWorld := roboto.Face(25.0, canvas.White, canvas.FontBold, canvas.FontNormal)
 
-	text := canvas.NewRichText()
-
+	text := canvas.NewRichText(standardFace)
+	name := nameMap[main]
 	if main == worldId {
-		text.Add(standardFaceTargetWorld, nameMap[main])
+		text.Add(standardFaceTargetWorld, name)
 	} else {
-		text.Add(standardFace, nameMap[main])
+		text.Add(standardFace, name)
 	}
 
 	for i := range all {
 		link := all[i]
 		if link != main {
 			if link == worldId {
-				text.Add(linkFaceTargetWorld, "\n + "+nameMap[link])
+				text.Add(linkFaceTargetWorld, "\n+ "+nameMap[link])
 			} else {
-				text.Add(linkFace, "\n + "+nameMap[link])
+				text.Add(linkFace, "\n+ "+nameMap[link])
 			}
 		}
 	}
 	return text
 }
 
-func drawServeName(c *canvas.Context, currentX float64, row float64, cell *canvas.Text, width float64) {
+func (i *Imager) drawServeName(c *canvas.Context, currentX float64, row float64, text *canvas.RichText, width float64) {
+	cell := text.ToText(width, rowSize, canvas.Right, canvas.Center, 0, 0)
 	offsetY := bottomOffset + (rowSize * row)
+
+	//c.SetFillColor(canvas.Transparent)
+	//c.SetStrokeColor(canvas.Green)
+	//c.DrawPath(currentX, offsetY, canvas.Rectangle(width, rowSize))
+	//
 	//c.SetFillColor(canvas.Transparent)
 	//c.SetStrokeColor(canvas.Red)
-	//c.DrawPath(currentX, offsetY, canvas.Rectangle(width, rowSize))
+	//c.DrawPath(currentX+(width-cell.Bounds().W), offsetY+rowSize/2-(cell.Bounds().H/2), canvas.Rectangle(cell.Bounds().W, cell.Bounds().H))
 
 	c.DrawText(currentX-cell.Bounds().X+(width-cell.Bounds().W), offsetY-cell.Bounds().Y+rowSize/2-(cell.Bounds().H/2), cell)
 }
 
-func fillCanvas(c *canvas.Context, color color.Color) {
+func (i *Imager) fillCanvas(c *canvas.Context, color color.Color) {
 	c.Push()
 	c.SetFillColor(color)
 	p := canvas.Rectangle(c.Width(), c.Height())

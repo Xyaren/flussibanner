@@ -2,48 +2,73 @@ package main
 
 import (
 	"flag"
-	"github.com/tdewolff/canvas"
-	"github.com/tdewolff/canvas/pdf"
-	"github.com/tdewolff/canvas/rasterizer"
-	"github.com/tdewolff/canvas/svg"
-	"github.com/xyaren/flussibanner/internal/api"
-	"github.com/xyaren/flussibanner/internal/imggen"
 	"image/jpeg"
-	"image/png"
 	"log"
 	"net/http"
 	"strconv"
+
+	"github.com/tdewolff/canvas"
+	"github.com/tdewolff/canvas/renderers"
+	"github.com/tdewolff/canvas/renderers/pdf"
+	"github.com/tdewolff/canvas/renderers/svg"
+	"github.com/xyaren/flussibanner/internal/api"
+	"github.com/xyaren/flussibanner/internal/imggen"
 )
 
 const worldId int = 2202
 
-var options = jpeg.Options{Quality: 95}
-
 func main() {
 	portPtr := flag.Int("port", 8080, "webserverPort")
+	//worldId := flag.Int("worldId", 2202, "Gw2 World id (e.g. 2202)")
 	flag.Parse()
 
-	http.HandleFunc("/png", func(w http.ResponseWriter, r *http.Request) {
-		var img = rasterizer.Draw(getImage(), canvas.DPMM(2))
-		_ = png.Encode(w, img)
-	})
-	http.HandleFunc("/jpeg", func(w http.ResponseWriter, r *http.Request) {
-		var img = rasterizer.Draw(getImage(), canvas.DPMM(2))
-		_ = jpeg.Encode(w, img, &options)
-	})
-	http.HandleFunc("/svg", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Add("Content-Type", "image/svg+xml")
-		_ = svg.Writer(w, getImage())
-	})
-	http.HandleFunc("/pdf", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Add("Content-Type", "application/pdf")
-		_ = pdf.Writer(w, getImage())
-	})
+	colorSpace := canvas.SRGBColorSpace{}
+
+	resolution := canvas.DPMM(2)
+
+	imager := imggen.NewImager()
+	http.HandleFunc("/png", handler(imager, renderers.PNG(resolution, colorSpace), "image/png", false))
+	http.HandleFunc("/jpeg", handler(imager, renderers.JPEG(resolution, colorSpace, &jpeg.Options{Quality: 95}), "image/jpeg", false))
+	http.HandleFunc("/svg", handler(imager, renderers.SVG(svgOptions()), "image/svg+xml", true))
+	http.HandleFunc("/pdf", handler(imager, renderers.PDF(pdfOptions()), "application/pdf", false))
 
 	log.Fatal(http.ListenAndServe(":"+strconv.Itoa(*portPtr), nil))
 }
 
-func getImage() *canvas.Canvas {
+func pdfOptions() *pdf.Options {
+	opt := pdf.DefaultOptions
+	opt.Compress = true
+	opt.SubsetFonts = true
+	return &opt
+}
+
+func svgOptions() *svg.Options {
+	opt := svg.DefaultOptions
+	opt.Compression = 2
+	opt.EmbedFonts = true
+	opt.SubsetFonts = true
+	return &opt
+}
+
+func handler(imager *imggen.Imager, writer canvas.Writer, contentType string, gzipEncoded bool) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("Content-Type", contentType)
+		if gzipEncoded {
+			w.Header().Add("Content-Encoding", "gzip")
+		}
+		image := getImage(imager)
+		err := writer(w, image)
+		handleError(err)
+	}
+}
+
+func handleError(err error) {
+	if err != nil {
+		panic(err)
+	}
+}
+
+func getImage(imager *imggen.Imager) *canvas.Canvas {
 	match, nameMap, stats := api.GetData(worldId)
-	return imggen.DrawImage(match, nameMap, stats, worldId)
+	return imager.DrawImage(match, nameMap, stats, worldId)
 }
