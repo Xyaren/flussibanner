@@ -70,9 +70,9 @@ func (i *Imager) draw(c *canvas.Context, match gw2api.Match, worldNameMap map[in
 	currentX += i.drawServerNames(c, currentX, match, worldNameMap, tier, worldId)
 	currentX += 10
 	currentX += i.drawBars(c, currentX, match.VictoryPoints, "Victory Points")
-	currentX += 20
+	currentX += 10
 	currentX += i.drawBars(c, currentX, match.Skirmishes[len(match.Skirmishes)-1].Scores, "Current Skirmish Score")
-	currentX += 20
+	currentX += 10
 	currentX += i.drawKillDeathRatio(c, currentX, stats)
 
 	//drawText(c, 30.0, canvas.NewTextBox(textFace, lorem[3], 140.0, 0.0, canvas.Justify, canvas.Top, 5.0, 0.0))
@@ -80,7 +80,7 @@ func (i *Imager) draw(c *canvas.Context, match gw2api.Match, worldNameMap map[in
 }
 
 func (i *Imager) drawKillDeathRatio(c *canvas.Context, x float64, stats gw2api.MatchStats) float64 {
-	cellWidth := float64(35)
+	cellWidth := float64(32)
 
 	headerFace := roboto.Face(40.0, canvas.White, canvas.FontRegular, canvas.FontNormal)
 	headerBox := canvas.NewTextBox(headerFace, "Kill/Death Ratio", cellWidth*5, rowSize/2, canvas.Center, canvas.Center, 0, 0)
@@ -245,7 +245,7 @@ func (i *Imager) drawScore(offset float64, score float64, highestScore float64, 
 }
 
 func (i *Imager) drawServerNames(c *canvas.Context, currentX float64, match gw2api.Match, worldNameMap map[int]string, tier string, worldId int) float64 {
-	maxWidth := float64(105)
+	maxWidth := float64(130)
 	greenText := i.getName(worldNameMap, match.Worlds.Green, match.AllWorlds.Green, worldId)
 	blueText := i.getName(worldNameMap, match.Worlds.Blue, match.AllWorlds.Blue, worldId)
 	redText := i.getName(worldNameMap, match.Worlds.Red, match.AllWorlds.Red, worldId)
@@ -294,16 +294,16 @@ func (i *Imager) getName(nameMap map[int]string, main int, all []int, worldId in
 }
 
 func (i *Imager) drawServeName(c *canvas.Context, currentX float64, row float64, text *canvas.RichText, width float64) {
-	cell := text.ToText(width, rowSize, canvas.Justify, canvas.Center, 0, 0)
+	cell := text.ToText(width, rowSize, canvas.Right, canvas.Center, 0, 0)
 	offsetY := bottomOffset + (rowSize * row)
 
-	c.SetFillColor(canvas.Transparent)
-	c.SetStrokeColor(canvas.Green)
-	c.DrawPath(currentX, offsetY, canvas.Rectangle(width, rowSize))
-
-	c.SetFillColor(canvas.Transparent)
-	c.SetStrokeColor(canvas.Red)
-	c.DrawPath(currentX+(width-cell.Bounds().W), offsetY+rowSize/2-(cell.Bounds().H/2), canvas.Rectangle(cell.Bounds().W, cell.Bounds().H))
+	//c.SetFillColor(canvas.Transparent)
+	//c.SetStrokeColor(canvas.Green)
+	//c.DrawPath(currentX, offsetY, canvas.Rectangle(width, rowSize))
+	//
+	//c.SetFillColor(canvas.Transparent)
+	//c.SetStrokeColor(canvas.Red)
+	//c.DrawPath(currentX+(width-cell.Bounds().W), offsetY+rowSize/2-(cell.Bounds().H/2), canvas.Rectangle(cell.Bounds().W, cell.Bounds().H))
 
 	c.DrawText(currentX-cell.Bounds().X+(width-cell.Bounds().W), offsetY-cell.Bounds().Y+rowSize/2-(cell.Bounds().H/2), cell)
 }
