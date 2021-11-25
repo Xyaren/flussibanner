@@ -6,7 +6,7 @@ ADD ./ /app/
 WORKDIR /app
 
 RUN go build -o main ./cmd/flussibanner-server/
-
+RUN ls -ahl .
 # image
 FROM scratch
 COPY --from=builder /app/main /main
