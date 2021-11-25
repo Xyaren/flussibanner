@@ -6,9 +6,9 @@ ADD ./ /app/
 WORKDIR /app
 
 RUN go build -o main ./cmd/flussibanner-server/
-RUN ls -ahl .
+RUN ls -ahln .
 # image
 FROM scratch
-COPY --from=builder /app/main /main
+COPY --chmod=777 --from=builder /app/main /main
 EXPOSE 8080
 ENTRYPOINT ["/main"]
