@@ -5,10 +5,9 @@ RUN mkdir /app
 ADD ./ /app/
 WORKDIR /app
 
-RUN go build -o main ./cmd/flussibanner-server/
-RUN ls -ahln .
+RUN CGO_ENABLED=0 go build -o main ./cmd/flussibanner-server/
 # image
 FROM scratch
-COPY --chmod=777 --from=builder /app/main /main
+COPY --from=builder /app/main /main
 EXPOSE 8080
 ENTRYPOINT ["/main"]
