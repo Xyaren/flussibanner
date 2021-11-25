@@ -11,4 +11,4 @@ RUN go build -o main ./cmd/flussibanner-server/
 FROM scratch
 COPY --from=builder /app/main /main
 EXPOSE 8080
-CMD ["/main"]
+ENTRYPOINT ["/main"]
