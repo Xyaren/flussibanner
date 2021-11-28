@@ -283,10 +283,13 @@ func (i *Imager) getName(nameMap map[int]string, main int, all []int, worldId in
 	for i := range all {
 		link := all[i]
 		if link != main {
-			if link == worldId {
-				text.Add(linkFaceTargetWorld, "\n+ "+nameMap[link])
-			} else {
-				text.Add(linkFace, "\n+ "+nameMap[link])
+			worldName := nameMap[link]
+			if worldName != "" { // empty world names can happen, just ignore those
+				if link == worldId {
+					text.Add(linkFaceTargetWorld, "\n+ "+worldName)
+				} else {
+					text.Add(linkFace, "\n+ "+worldName)
+				}
 			}
 		}
 	}
