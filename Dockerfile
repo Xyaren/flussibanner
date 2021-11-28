@@ -5,7 +5,7 @@ RUN mkdir /app
 ADD ./ /app/
 WORKDIR /app
 
-RUN CGO_ENABLED=0 go build -o main ./cmd/flussibanner-server/
+RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o main ./cmd/flussibanner-server/
 # image
 
 FROM alpine:latest AS builder2
