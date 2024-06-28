@@ -8,6 +8,7 @@ import (
 	"image/color"
 	"image/png"
 	"math"
+	"sort"
 	"strings"
 	"time"
 
@@ -131,7 +132,7 @@ func (i *Imager) drawCell(width float64, c *canvas.Context, x float64, column in
 		//fontStyle = canvas.FontBold
 		decorators = append(decorators, canvas.FontUnderline)
 	}
-	standardFace := roboto.Face(35.0, textColor, fontStyle, canvas.FontNormal, decorators...)
+	standardFace := roboto.Face(35.0, textColor, fontStyle, canvas.FontNormal, decorators)
 
 	var text string
 	if math.IsNaN(kdRatio) {
@@ -272,26 +273,36 @@ func (i *Imager) getName(nameMap map[int]string, main int, all []int, worldId in
 	linkFace := roboto.Face(25.0, canvas.White, canvas.FontRegular, canvas.FontNormal)
 	linkFaceTargetWorld := roboto.Face(25.0, canvas.White, canvas.FontBold, canvas.FontNormal)
 
+	sort.SliceStable(all, func(i, j int) bool {
+		return all[i] == main
+	})
+
+	writtenMain := false
 	text := canvas.NewRichText(standardFace)
-	name := nameMap[main]
-	if main == worldId {
-		text.Add(standardFaceTargetWorld, name)
-	} else {
-		text.Add(standardFace, name)
-	}
 
 	for i := range all {
 		link := all[i]
-		if link != main {
-			worldName := nameMap[link]
-			if worldName != "" { // empty world names can happen, just ignore those
+		worldName := nameMap[link]
+		if worldName != "" { // empty world names can happen, just ignore those
+			prefix := ""
+			typeface := linkFace
+			if writtenMain {
+				prefix = "\n+ "
+				typeface = linkFace
 				if link == worldId {
-					text.Add(linkFaceTargetWorld, "\n+ "+worldName)
+					typeface = linkFaceTargetWorld
+				}
+			} else {
+				if link == worldId {
+					typeface = standardFaceTargetWorld
 				} else {
-					text.Add(linkFace, "\n+ "+worldName)
+					typeface = standardFace
 				}
 			}
+			text.WriteFace(typeface, prefix+worldName)
+			writtenMain = true
 		}
+
 	}
 	return text
 }

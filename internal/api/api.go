@@ -1,16 +1,19 @@
 package api
 
 import (
+	"encoding/json"
 	"fmt"
-	"log"
-
 	"github.com/avast/retry-go"
+	"log"
+	"net/http"
+	"time"
+
 	"github.com/xyaren/gw2api"
 )
 
 var api = gw2api.NewGW2Api()
 
-const language = "de"
+const language = "en"
 
 var lastMatchId *string = nil
 
@@ -125,13 +128,38 @@ func getStats(matchId string) gw2api.MatchStats {
 
 func getWorldNames(worldIds []int) map[int]string {
 	var worlds []gw2api.World
+	//err := retry.Do(
+	//	func() error {
+	//		var err error
+	//		worlds, err = api.WorldIds(language, worldIds...)
+	//		if err != nil {
+	//			return err
+	//		}
+	//		return nil
+	//	},
+	//	retryLog,
+	//)
+	//if err != nil {
+	//	panic(err)
+	//}
+
 	err := retry.Do(
 		func() error {
 			var err error
-			worlds, err = api.WorldIds(language, worldIds...)
+			var myClient = &http.Client{Timeout: 10 * time.Second}
+			r, err := myClient.Get("https://next.werdes.net/json/temp_worlds.json")
 			if err != nil {
 				return err
 			}
+			defer r.Body.Close()
+
+			var nextWorlds []gw2api.World
+			err = json.NewDecoder(r.Body).Decode(&nextWorlds)
+			if err != nil {
+				return err
+			}
+			worlds = append(worlds, nextWorlds...)
+
 			return nil
 		},
 		retryLog,
@@ -139,6 +167,7 @@ func getWorldNames(worldIds []int) map[int]string {
 	if err != nil {
 		panic(err)
 	}
+
 	return toMap(worlds)
 }
 

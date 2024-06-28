@@ -15,11 +15,9 @@ import (
 	"github.com/xyaren/flussibanner/internal/imggen"
 )
 
-const worldId int = 2202
-
 func main() {
 	portPtr := flag.Int("port", 8080, "webserverPort")
-	//worldId := flag.Int("worldId", 2202, "Gw2 World id (e.g. 2202)")
+	worldId := flag.Int("worldId", 2202, "world Id")
 	flag.Parse()
 
 	colorSpace := canvas.SRGBColorSpace{}
@@ -27,10 +25,10 @@ func main() {
 	resolution := canvas.DPMM(2)
 
 	imager := imggen.NewImager()
-	http.HandleFunc("/png", handler(imager, renderers.PNG(resolution, colorSpace), "image/png", false))
-	http.HandleFunc("/jpeg", handler(imager, renderers.JPEG(resolution, colorSpace, &jpeg.Options{Quality: 95}), "image/jpeg", false))
-	http.HandleFunc("/svg", handler(imager, renderers.SVG(svgOptions()), "image/svg+xml", true))
-	http.HandleFunc("/pdf", handler(imager, renderers.PDF(pdfOptions()), "application/pdf", false))
+	http.HandleFunc("/png", handler(*worldId, imager, renderers.PNG(resolution, colorSpace), "image/png", false))
+	http.HandleFunc("/jpeg", handler(*worldId, imager, renderers.JPEG(resolution, colorSpace, &jpeg.Options{Quality: 95}), "image/jpeg", false))
+	http.HandleFunc("/svg", handler(*worldId, imager, renderers.SVG(svgOptions()), "image/svg+xml", true))
+	http.HandleFunc("/pdf", handler(*worldId, imager, renderers.PDF(pdfOptions()), "application/pdf", false))
 
 	log.Fatal(http.ListenAndServe(":"+strconv.Itoa(*portPtr), nil))
 }
@@ -50,13 +48,13 @@ func svgOptions() *svg.Options {
 	return &opt
 }
 
-func handler(imager *imggen.Imager, writer canvas.Writer, contentType string, gzipEncoded bool) func(w http.ResponseWriter, r *http.Request) {
+func handler(worldId int, imager *imggen.Imager, writer canvas.Writer, contentType string, gzipEncoded bool) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Content-Type", contentType)
 		if gzipEncoded {
 			w.Header().Add("Content-Encoding", "gzip")
 		}
-		image := getImage(imager)
+		image := getImage(worldId, imager)
 		err := writer(w, image)
 		handleError(err)
 	}
@@ -68,7 +66,7 @@ func handleError(err error) {
 	}
 }
 
-func getImage(imager *imggen.Imager) *canvas.Canvas {
-	match, nameMap, stats := api.GetData(worldId)
-	return imager.DrawImage(match, nameMap, stats, worldId)
+func getImage(id int, imager *imggen.Imager) *canvas.Canvas {
+	match, nameMap, stats := api.GetData(id)
+	return imager.DrawImage(match, nameMap, stats, id)
 }
